@@ -1,0 +1,73 @@
+# Example ESPHome configuration for I2C Soil Moisture Sensor
+# This sensor is based on the Chirp/Catnip I2C soil moisture sensor
+# https://github.com/Miceuz/i2c-moisture-sensor
+
+esphome:
+  name: soil-moisture-sensor
+  platform: ESP32  # or ESP8266
+  board: esp32dev  # adjust to your board
+
+wifi:
+  ssid: "YourSSID"
+  password: "YourPassword"
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+# I2C Bus configuration
+i2c:
+  sda: GPIO21  # Adjust to your setup
+  scl: GPIO22  # Adjust to your setup
+  scan: true
+  id: bus_a
+
+# External components
+external_components:
+  - source:
+      type: local
+      path: components
+
+# Sensor configuration
+sensor:
+  - platform: i2c_soil_moisture
+    id: soil_sensor
+    address: 0x20  # Default address, can be changed
+    update_interval: 60s
+
+    # Calibration values (optional, defaults shown)
+    # Measure these with your specific sensor:
+    # - dry_value: capacitance reading in open air
+    # - wet_value: capacitance reading in water
+    dry_value: 290    # Default for open air at 5V
+    wet_value: 600    # Default for water
+
+    # Moisture percentage (calibrated)
+    moisture:
+      name: "Soil Moisture"
+      id: moisture_percent
+      filters:
+        - lambda: |-
+            if (x < 0) return 0;
+            if (x > 100) return 100;
+            return x;
+
+    # Raw capacitance value (useful for calibration)
+    capacitance:
+      name: "Soil Capacitance"
+      id: capacitance_raw
+
+    # Temperature in Celsius
+    temperature:
+      name: "Soil Temperature"
+      id: soil_temp
+
+    # Light sensor (higher values = darker)
+    light:
+      name: "Soil Light Level"
+      id: light_level
