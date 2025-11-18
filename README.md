@@ -1,4 +1,4 @@
-# I2C Soil Moisture Sensor for ESPHome
+# Catnip Soil Sensor for ESPHome
 
 ESPHome external component for the Chirp/Catnip I2C capacitive soil moisture sensor.
 
@@ -8,10 +8,11 @@ Based on the sensor available at: https://github.com/Miceuz/i2c-moisture-sensor
 
 This component provides the following sensor readings:
 
-- **Moisture** - Calibrated soil moisture percentage (0-100%)
-- **Capacitance** - Raw capacitance value for manual calibration
+- **Capacitance** - Raw capacitance value from the sensor
 - **Temperature** - Soil temperature in Celsius
 - **Light** - Ambient light level (higher values = darker)
+
+> **Note:** This component exports raw sensor values. To calculate moisture percentage, use Home Assistant template sensors with your own calibration values.
 
 ## Hardware
 
@@ -37,16 +38,16 @@ Connect the sensor to your ESP device:
 
 ### 1. Copy Component Files
 
-Clone this repository or copy the `components/i2c_soil_moisture` directory to your ESPHome configuration directory.
+Clone this repository or copy the `components/catnip_soil_sensor` directory to your ESPHome configuration directory.
 
 ```
 your-esphome-config/
 ├── components/
-│   └── i2c_soil_moisture/
+│   └── catnip_soil_sensor/
 │       ├── __init__.py
 │       ├── sensor.py
-│       ├── i2c_soil_moisture.h
-│       └── i2c_soil_moisture.cpp
+│       ├── catnip_soil_sensor.h
+│       └── catnip_soil_sensor.cpp
 └── your-device.yaml
 ```
 
@@ -69,12 +70,9 @@ external_components:
 
 # Configure sensor
 sensor:
-  - platform: i2c_soil_moisture
+  - platform: catnip_soil_sensor
     address: 0x20
     update_interval: 60s
-
-    moisture:
-      name: "Soil Moisture"
 
     capacitance:
       name: "Soil Capacitance"
@@ -92,17 +90,12 @@ sensor:
 
 - **address** (*Optional*, int): I2C address of the sensor. Defaults to `0x20`.
 - **update_interval** (*Optional*, Time): Update interval for sensor readings. Defaults to `60s`.
-- **dry_value** (*Optional*, int): Capacitance value when sensor is completely dry (in air). Used for moisture percentage calculation. Defaults to `290`.
-- **wet_value** (*Optional*, int): Capacitance value when sensor is completely wet (in water). Used for moisture percentage calculation. Defaults to `600`.
 
 ### Sensor Outputs
 
 All sensor outputs are optional. Configure only the sensors you need.
 
-- **moisture** (*Optional*): Soil moisture as a percentage (0-100%). Calculated from capacitance using dry_value and wet_value.
-  - All options from [Sensor](https://esphome.io/components/sensor/index.html#config-sensor)
-
-- **capacitance** (*Optional*): Raw capacitance value. Useful for calibration.
+- **capacitance** (*Optional*): Raw capacitance value from the sensor.
   - All options from [Sensor](https://esphome.io/components/sensor/index.html#config-sensor)
 
 - **temperature** (*Optional*): Soil temperature in Celsius.
@@ -111,28 +104,34 @@ All sensor outputs are optional. Configure only the sensors you need.
 - **light** (*Optional*): Ambient light level (higher values indicate darker conditions).
   - All options from [Sensor](https://esphome.io/components/sensor/index.html#config-sensor)
 
-## Calibration
+## Calculating Moisture Percentage
 
-For accurate moisture percentage readings, calibrate your sensor:
+This component exports raw capacitance values. To calculate moisture percentage, you can use Home Assistant template sensors with your own calibration values.
+
+### Calibration Steps
 
 1. **Measure Dry Value:**
    - Leave the sensor in open air
    - Read the `capacitance` sensor value
-   - Note this as your `dry_value`
+   - Note this as your dry value (typically around 290)
 
 2. **Measure Wet Value:**
    - Submerge the sensor in water (only the sensing area, not electronics!)
    - Read the `capacitance` sensor value
-   - Note this as your `wet_value`
+   - Note this as your wet value (typically around 600-650)
 
-3. **Update Configuration:**
+3. **Create Template Sensor in Home Assistant:**
    ```yaml
-   sensor:
-     - platform: i2c_soil_moisture
-       dry_value: 290  # Your measured dry value
-       wet_value: 650  # Your measured wet value
-       moisture:
-         name: "Soil Moisture"
+   template:
+     - sensor:
+         - name: "Soil Moisture Percentage"
+           unit_of_measurement: "%"
+           state: >
+             {% set dry_value = 290 %}
+             {% set wet_value = 650 %}
+             {% set raw = states('sensor.soil_capacitance') | float %}
+             {% set moisture = ((raw - dry_value) / (wet_value - dry_value) * 100) | round(1) %}
+             {{ [0, [moisture, 100] | min] | max }}
    ```
 
 ## Example Configuration
@@ -157,17 +156,16 @@ The component communicates with the following sensor registers:
 
 The component performs measurements in the following order:
 1. Read capacitance value
-2. Calculate and publish moisture percentage (if configured)
-3. Read temperature
-4. Trigger light measurement
-5. Wait ~1.5 seconds
-6. Read light value (on next update cycle)
+2. Read temperature
+3. Trigger light measurement
+4. Wait ~1.5 seconds
+5. Read light value (on next update cycle)
 
 ## Troubleshooting
 
 ### Sensor Not Found
 
-If you see "Communication with I2C Soil Moisture Sensor failed!" in the logs:
+If you see "Communication with Catnip Soil Sensor failed!" in the logs:
 
 1. Check wiring connections
 2. Verify I2C pins are correct for your ESP board
@@ -176,9 +174,9 @@ If you see "Communication with I2C Soil Moisture Sensor failed!" in the logs:
 
 ### Incorrect Readings
 
-- **Moisture always 0% or 100%:** Recalibrate using your specific sensor values
 - **Temperature seems wrong:** Sensor reports in tenths of Celsius (252 = 25.2°C)
 - **Light values noisy:** This is expected; the light sensor is less precise than other readings
+- **Capacitance readings seem off:** Use the calibration method above to determine your sensor's specific dry/wet values
 
 ## License
 
