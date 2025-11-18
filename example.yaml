@@ -1,4 +1,4 @@
-# Example ESPHome configuration for I2C Soil Moisture Sensor
+# Example ESPHome configuration for Catnip I2C Soil Moisture Sensor
 # This sensor is based on the Chirp/Catnip I2C soil moisture sensor
 # https://github.com/Miceuz/i2c-moisture-sensor
 
@@ -35,29 +35,13 @@ external_components:
 
 # Sensor configuration
 sensor:
-  - platform: i2c_soil_moisture
+  - platform: catnip_soil_sensor
     id: soil_sensor
     address: 0x20  # Default address, can be changed
     update_interval: 60s
+    i2c_id: bus_a  # Reference to the I2C bus defined above
 
-    # Calibration values (optional, defaults shown)
-    # Measure these with your specific sensor:
-    # - dry_value: capacitance reading in open air
-    # - wet_value: capacitance reading in water
-    dry_value: 290    # Default for open air at 5V
-    wet_value: 600    # Default for water
-
-    # Moisture percentage (calibrated)
-    moisture:
-      name: "Soil Moisture"
-      id: moisture_percent
-      filters:
-        - lambda: |-
-            if (x < 0) return 0;
-            if (x > 100) return 100;
-            return x;
-
-    # Raw capacitance value (useful for calibration)
+    # Raw capacitance value
     capacitance:
       name: "Soil Capacitance"
       id: capacitance_raw

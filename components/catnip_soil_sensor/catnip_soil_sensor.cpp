@@ -1,11 +1,11 @@
-#include "i2c_soil_moisture.h"
+#include "catnip_soil_sensor.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
 namespace esphome {
-namespace i2c_soil_moisture {
+namespace catnip_soil_sensor {
 
-static const char *const TAG = "i2c_soil_moisture";
+static const char *const TAG = "catnip_soil_sensor";
 
 void I2CSoilMoisture::setup() {
   ESP_LOGCONFIG(TAG, "Setting up I2C Soil Moisture Sensor...");
@@ -30,15 +30,9 @@ void I2CSoilMoisture::dump_config() {
     ESP_LOGE(TAG, "Communication with I2C Soil Moisture Sensor failed!");
   }
 
-  LOG_SENSOR("  ", "Moisture", this->moisture_sensor_);
   LOG_SENSOR("  ", "Capacitance", this->capacitance_sensor_);
   LOG_SENSOR("  ", "Temperature", this->temperature_sensor_);
   LOG_SENSOR("  ", "Light", this->light_sensor_);
-
-  if (this->moisture_sensor_ != nullptr) {
-    ESP_LOGCONFIG(TAG, "  Dry Value: %d", this->dry_value_);
-    ESP_LOGCONFIG(TAG, "  Wet Value: %d", this->wet_value_);
-  }
 }
 
 void I2CSoilMoisture::update() {
@@ -63,30 +57,12 @@ void I2CSoilMoisture::update() {
     }
   }
 
-  // Read capacitance/moisture
-  if (this->capacitance_sensor_ != nullptr || this->moisture_sensor_ != nullptr) {
+  // Read capacitance
+  if (this->capacitance_sensor_ != nullptr) {
     uint16_t capacitance;
     if (this->read_register_16bit_(I2C_SOIL_MOISTURE_GET_CAPACITANCE, &capacitance)) {
       ESP_LOGD(TAG, "Got capacitance: %d", capacitance);
-
-      if (this->capacitance_sensor_ != nullptr) {
-        this->capacitance_sensor_->publish_state(capacitance);
-      }
-
-      if (this->moisture_sensor_ != nullptr) {
-        // Convert capacitance to moisture percentage
-        // Linear interpolation between dry and wet values
-        float moisture = 0.0f;
-        if (capacitance <= this->dry_value_) {
-          moisture = 0.0f;
-        } else if (capacitance >= this->wet_value_) {
-          moisture = 100.0f;
-        } else {
-          moisture = ((float)(capacitance - this->dry_value_) / (float)(this->wet_value_ - this->dry_value_)) * 100.0f;
-        }
-        ESP_LOGD(TAG, "Calculated moisture: %.1f%%", moisture);
-        this->moisture_sensor_->publish_state(moisture);
-      }
+      this->capacitance_sensor_->publish_state(capacitance);
     } else {
       ESP_LOGW(TAG, "Failed to read capacitance data");
     }
@@ -119,7 +95,7 @@ void I2CSoilMoisture::update() {
 
 bool I2CSoilMoisture::read_register_16bit_(uint8_t reg, uint16_t *value) {
   // Write register address
-  if (!this->write_byte(reg)) {
+  if (this->write(&reg, 1) != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "Failed to write register address 0x%02X", reg);
     return false;
   }
@@ -129,7 +105,7 @@ bool I2CSoilMoisture::read_register_16bit_(uint8_t reg, uint16_t *value) {
 
   // Read 2 bytes (MSB first)
   uint8_t data[2];
-  if (!this->read_bytes_raw(data, 2)) {
+  if (this->read(data, 2) != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "Failed to read 2 bytes from register 0x%02X", reg);
     return false;
   }
@@ -141,7 +117,7 @@ bool I2CSoilMoisture::read_register_16bit_(uint8_t reg, uint16_t *value) {
 
 bool I2CSoilMoisture::read_register_8bit_(uint8_t reg, uint8_t *value) {
   // Write register address
-  if (!this->write_byte(reg)) {
+  if (this->write(&reg, 1) != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "Failed to write register address 0x%02X", reg);
     return false;
   }
@@ -150,7 +126,7 @@ bool I2CSoilMoisture::read_register_8bit_(uint8_t reg, uint8_t *value) {
   delay(20);
 
   // Read 1 byte
-  if (!this->read_bytes_raw(value, 1)) {
+  if (this->read(value, 1) != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "Failed to read byte from register 0x%02X", reg);
     return false;
   }
@@ -159,12 +135,12 @@ bool I2CSoilMoisture::read_register_8bit_(uint8_t reg, uint8_t *value) {
 }
 
 bool I2CSoilMoisture::write_register_(uint8_t reg) {
-  if (!this->write_byte(reg)) {
+  if (this->write(&reg, 1) != i2c::ERROR_OK) {
     ESP_LOGW(TAG, "Failed to write to register 0x%02X", reg);
     return false;
   }
   return true;
 }
 
-}  // namespace i2c_soil_moisture
+}  // namespace catnip_soil_sensor
 }  // namespace esphome
